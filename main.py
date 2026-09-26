@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 # Added Depends and HTTPException for the reusable authentication guard.
 # Request is used for the custom error response format.
 from fastapi import FastAPI, Header, Depends, HTTPException, Request
-
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials # Stage 5 
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from supabase import create_client
@@ -30,6 +30,15 @@ print("Server running and connected to Supabase")
 
 app = FastAPI()
 
+# ============================================================
+# STAGE 5 — SWAGGER BEARER AUTHENTICATION
+# ============================================================
+
+# Tells FastAPI/Swagger that our API uses Bearer tokens.
+# This creates the Authorize 🔒 button in Swagger UI.
+
+
+security = HTTPBearer()
 
 # ============================================================
 # STAGE 4
@@ -46,6 +55,10 @@ app = FastAPI()
 # {
 #     "detail": "Access token required"
 # }
+
+# Stage 5 also makes Swagger recognize these routes
+# as requiring Bearer authentication.
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -83,51 +96,29 @@ class UserData(BaseModel):
 # without writing the token-checking code again.
 
 def get_current_user(
-    authorization: str | None = Header(default=None)
+    credentials: HTTPAuthorizationCredentials = Depends(security)
 ):
 
-    # SAME AUTH CHECK FROM STAGE 3
-    # Check if Authorization header exists
-    if not authorization:
-        raise HTTPException(
-            status_code=401,
-            detail="Access token required"
-        )
-
-    # SAME AUTH CHECK FROM STAGE 3
-    # Check if the header starts with "Bearer "
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=401,
-            detail="Access token required"
-        )
-
-    # SAME AUTH LOGIC FROM STAGE 3
-    # Extract the token from:
+    # Get the actual JWT token.
     #
-    # Bearer eyJhbGciOi...
+    # Example:
     #
-    # The [7:] removes "Bearer "
-    token = authorization[7:].strip()
+    # Authorization: Bearer eyJhbGciOi...
+    #
+    # credentials.credentials contains:
+    #
+    # eyJhbGciOi...
 
-    # SAME AUTH CHECK FROM STAGE 3
-    # Make sure the token is not empty
-    if not token:
-        raise HTTPException(
-            status_code=401,
-            detail="Access token required"
-        )
+    token = credentials.credentials
 
-    # SAME SUPABASE VERIFICATION FROM STAGE 3
+    # Verify token with Supabase
     try:
 
         response = supabase.auth.get_user(token)
 
-        # SAME AS STAGE 3
-        # Return the authenticated user
+        # Return authenticated user
         return response.user
 
-    # SAME AS STAGE 3
     except Exception:
 
         raise HTTPException(
